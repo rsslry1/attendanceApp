@@ -1,0 +1,101 @@
+// Smart Attendance System Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Instructor/User model
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  courses   Course[]
+  attendanceScans Attendance[] @relation("InstructorScans")
+}
+
+// Student model
+model Student {
+  id        String   @id @default(cuid())
+  studentId String   @unique // Unique student ID (e.g., 2024001)
+  firstName String
+  lastName  String
+  email     String?
+  section   String
+  qrSecret  String   @unique // Secret key for QR code signature
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  enrollments Enrollment[]
+  attendance  Attendance[]
+}
+
+// Course model with schedule
+model Course {
+  id          String   @id @default(cuid())
+  title       String   // e.g., "IT 101"
+  description String?
+  schedule    String   // e.g., "MWF 9:00-10:00 AM"
+  room        String?
+  startTime   String   // Class start time in HH:MM format (24h)
+  endTime     String   // Class end time in HH:MM format (24h)
+  gracePeriod Int      @default(15) // Grace period in minutes before marked as late
+  allowTimeOut Boolean @default(false) // Allow time-out scanning
+  instructorId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  instructor User   @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+  attendance  Attendance[]
+}
+
+// Student-Course enrollment (many-to-many relationship)
+model Enrollment {
+  id        String   @id @default(cuid())
+  studentId String
+  courseId  String
+  enrolledAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+}
+
+// Attendance record
+model Attendance {
+  id            String    @id @default(cuid())
+  courseId      String
+  studentId     String
+  instructorId  String?
+  date          DateTime  // Date of attendance (stores both date and time for scan)
+  status        AttendanceStatus
+  timeIn        DateTime? // Time-in timestamp
+  timeOut       DateTime? // Time-out timestamp (optional)
+  notes         String?
+  scannedAt     DateTime  @default(now()) // When the record was created
+  updatedAt     DateTime  @updatedAt
+
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  instructor User?   @relation("InstructorScans", fields: [instructorId], references: [id])
+
+  @@index([courseId, date])
+  @@index([studentId, date])
+  @@unique([courseId, studentId, date]) // One attendance record per student per course per day
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+}
