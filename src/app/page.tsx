@@ -167,16 +167,31 @@ export default function Home() {
     if (storedUser) {
       setUser(JSON.parse(storedUser));
       setIsAuthenticated(true);
-      loadData();
     }
   }, []);
 
+  // Load data when user is set (either from localStorage or login/register)
+  useEffect(() => {
+    if (user && isAuthenticated) {
+      console.log('👤 User state updated, loading data for:', user.id);
+      loadData();
+    }
+  }, [user]);
+
   const loadData = async () => {
+    console.log('🔄 Starting data fetch...');
     await Promise.all([
       fetchStudents(),
       fetchCourses(),
       fetchAttendanceHistory(),
     ]);
+    // Wait a moment for state updates to complete
+    setTimeout(() => {
+      console.log('📈 Data fetch completed. Current state:');
+      console.log('- Students:', students.length);
+      console.log('- Courses:', courses.length);
+      console.log('- Attendance History:', attendanceHistory.length);
+    }, 100);
   };
 
   // Authentication functions
@@ -190,11 +205,12 @@ export default function Home() {
       });
 
       if (res.ok) {
+        console.log('✅ Login successful, redirecting to dashboard and fetching data...');
         const userData = await res.json();
         setUser(userData);
         setIsAuthenticated(true);
+        setActiveTab('dashboard');
         localStorage.setItem('attendance_user', JSON.stringify(userData));
-        await loadData();
         toast({ title: 'Success', description: 'Logged in successfully' });
       } else {
         const error = await res.json();
@@ -219,11 +235,12 @@ export default function Home() {
       });
 
       if (res.ok) {
+        console.log('✅ Registration successful, redirecting to dashboard and fetching data...');
         const userData = await res.json();
         setUser(userData);
         setIsAuthenticated(true);
+        setActiveTab('dashboard');
         localStorage.setItem('attendance_user', JSON.stringify(userData));
-        await loadData();
         toast({ title: 'Success', description: 'Account created successfully' });
       } else {
         const error = await res.json();
@@ -247,18 +264,24 @@ export default function Home() {
   // Student management functions
   const fetchStudents = async () => {
     try {
+      console.log('📚 fetchStudents called, user:', user);
       if (!user) {
+        console.log('📚 No user found, skipping students fetch');
         setStudents([]);
         return;
       }
       
+      console.log('📚 Fetching students for instructor:', user.id);
       const res = await fetch(`/api/students?instructorId=${user.id}`);
       if (res.ok) {
         const data = await res.json();
+        console.log('📚 Students fetched:', data.length, 'students');
         setStudents(data);
+      } else {
+        console.error('❌ Failed to fetch students, status:', res.status);
       }
     } catch (error) {
-      console.error('Failed to fetch students:', error);
+      console.error('❌ Failed to fetch students:', error);
     }
   };
 
@@ -345,13 +368,17 @@ export default function Home() {
         return;
       }
       
+      console.log('📖 Fetching courses for instructor:', user.id);
       const res = await fetch(`/api/courses?instructorId=${user.id}`);
       if (res.ok) {
         const data = await res.json();
+        console.log('📖 Courses fetched:', data.length, 'courses');
         setCourses(data);
+      } else {
+        console.error('❌ Failed to fetch courses, status:', res.status);
       }
     } catch (error) {
-      console.error('Failed to fetch courses:', error);
+      console.error('❌ Failed to fetch courses:', error);
     }
   };
 
@@ -576,6 +603,7 @@ export default function Home() {
         return;
       }
       
+      console.log('📊 Fetching attendance history for instructor:', user.id);
       let url = '/api/attendance';
       const params = new URLSearchParams();
       params.append('instructorId', user.id);
@@ -587,10 +615,13 @@ export default function Home() {
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
+        console.log('📊 Attendance history fetched:', data.length, 'records');
         setAttendanceHistory(data);
+      } else {
+        console.error('❌ Failed to fetch attendance history, status:', res.status);
       }
     } catch (error) {
-      console.error('Failed to fetch attendance:', error);
+      console.error('❌ Failed to fetch attendance:', error);
     }
   };
 
